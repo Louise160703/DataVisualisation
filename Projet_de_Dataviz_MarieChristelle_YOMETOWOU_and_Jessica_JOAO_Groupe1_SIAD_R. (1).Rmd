@@ -1,0 +1,772 @@
+---
+title: "ProjetDataviz_MC_and_Jess"
+author: "Marie_christelle"
+date: "2025-03-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+---
+title: "Infidélité et facteurs socio-démographiques"
+author: "Projet Dataviz – Master SIAD"
+output: html_document
+---
+#Liens des datasets :
+  #https://search.r-project.org/CRAN/refmans/AER/html/Affairs.html
+
+
+```{r}
+
+#  Lignes doivent s'exécuter manuellement si les packages ne sont pas installés
+
+# install.packages("AER")
+# install.packages("tidyverse")
+# install.packages("ggrepel")
+# install.packages("ggmosaic")
+# install.packages("ggplot2")
+# install.packages("dplyr")
+# install.packages("shiny")
+# install.packages("scales")
+# install.packages("GSS")
+#install.packages("lubridate")
+#install.packages("magrittr")
+#install.packages("ggpubr")
+#install.packages("rticles")
+#install.packages("hrbrthemes")
+#install.packages("forcats")
+#install.packages("ggridges")
+#install.packages("cowplot")
+#install.packages("ggthemes")
+#install.packages("fmsb")
+#install.packages("wesanderson")
+#install.packages("knitr", "rmarkdown", "markdown")
+#install.packages("tidyr")
+#install.packages("dplyr")
+#install.packages("plotly")
+#install.packages("paletteer")
+#install.packages("extrafont")
+#install.packages("kableExtra")
+#install.packages('data.table')
+#install.packages("readxl")
+#install.packages("jtools")
+#install.packages("ggrepel")
+#install.packages("fastDummies")
+#install.packages("xtable")
+#install.packages("sjPlot")
+#install.packages("sjmisc")
+#install.packages("sjlabelled")
+#install.packages("lmtest")
+#install.packages("modelsummary")
+#install.packages("kableExtra")
+#install.packages("gt")
+#install.packages("esquisse")
+#install.packages("sandwich")
+#install.packages("questionr")
+#install.packages(FactoMineR)
+#install.packages("explor")
+#install.packages("stringr")
+#install.packages("fmsb")
+#install.packages("forcats")
+```
+
+
+```{r}
+
+library("AER")
+library("tidyverse")
+library("ggrepel")
+library("ggmosaic")
+library("ggplot2")
+library("shiny")
+library("scales")
+library("gss")
+library("lubridate")
+library("magrittr")
+library("ggpubr")
+library("rticles")
+library("hrbrthemes")
+library("forcats")
+library("ggridges")
+library("cowplot")
+library("ggthemes")
+library("fmsb")
+library("wesanderson")
+library("knitr", "rmarkdown", "markdown")
+library("tidyr")
+library("dplyr")
+library("plotly")
+library("paletteer")
+library("extrafont")
+library("kableExtra")
+library('data.table')
+library("readxl")
+library("jtools")
+library("ggrepel")
+library("fastDummies")
+library("xtable")
+library("sjPlot")
+library("sjmisc")
+library("sjlabelled")
+library("lmtest")
+library("modelsummary")
+library("kableExtra")
+library("gt")
+library("esquisse")
+library("sandwich")
+library("questionr")
+library("FactoMineR")
+library("explor")
+library("stringr")
+library("fmsb")
+library("forcats")
+```
+
+
+
+```{r}
+data("Affairs")
+
+datasummary_skim(Affairs)
+```
+1. Objectif & Données
+Ce projet vise à explorer les facteurs liés à l’infidélité à partir des données Affairs (AER package), issues d'une enquête de Psychology Today (1969).
+Nous analysons l’influence de variables comme le sexe, l’âge, la satisfaction conjugale ou la religiosité sur la fréquence des relations extraconjugales.
+
+
+```{r}
+#Aperçu des données
+
+head(Affairs)
+glimpse(Affairs)
+```
+
+
+#Traitement des données
+
+## Conversion des variables en facteurs avec renommage des modalités directement dans les colonnes existantes
+
+On a commencé par renommer la variable affairs. On a gardé le découpage de base (de 0 à 7), mais on a donné des noms un peu plus fun pour refléter le niveau d'infidélité (du genre “Accident de Parcours” à “Champion Olympique de la Tromperie”).
+
+Pour la variable children, on l’a simplifiée en “Oui” ou “Non”, histoire de savoir s’il y a des enfants dans le foyer ou pas, tout simplement.
+
+La variable religiousness a aussi été recodée, en gardant les niveaux d’origine, mais avec des libellés plus parlants (par exemple, anti devient Anti_Religion). L’idée, c’était de rendre ça plus compréhensible sans changer le fond.
+
+Pour occupation, on s’est basé sur la classification de Hollingshead (1957), qui classe les professions du statut social le plus haut au plus bas. Sauf que dans notre dataset, c’est l’inverse : le 1 correspond aux professions les moins valorisées, et le 7 aux plus prestigieuses. Du coup, on a recodé les niveaux pour qu’ils correspondent bien à cette logique inversée.
+
+Enfin, pour education et pour l'année de mariage, on s’est basé sur la doc pour recoder les niveaux : de l’école primaire jusqu’au doctorat ou diplômes équivalents. Là aussi, on a juste mis des noms plus explicites pour chaque niveau.
+
+
+
+```{r}
+Infidélité <- Affairs %>%
+               mutate(affairs = ifelse(affairs== 0,
+                                               "Aucune Relation Extraconjugale",
+                                               ifelse(affairs == 1,
+                                               "Accident de Parcours (Une fois)",
+                                               ifelse(affairs == 2,
+                                                      "Récidiviste (Deux fois)",
+                                                      ifelse(affairs == 3,
+                                                             "Petit Trompeur Régulier (3 fois)",
+                                                             ifelse(affairs == 7,
+                                                             "Amateur d'Aventure (4 à 10 fois)",
+                                                             "Champion Olympique de la Tromperie "
+                                                                    )
+                                                              )
+                                                      )
+                                                  )
+                                              ),
+    children = factor(children,
+                      labels = c("Non", "Oui")),
+    rating = factor(rating,
+                    levels = 1:5,
+                    labels = c(
+                      "Très_malheureux",
+                      "Plutôt_malheureux",
+                      "Moyen",
+                      "Plutôt_heureux",
+                      "Très_heureux"
+                    )),
+    religiousness = factor(religiousness,
+                           levels = 1:5,
+                           labels = c(
+                             "Anti_Religion",
+                             "Pas_du_tout_Religieux",
+                             "Légèrement_Religieux",
+                             "Un_peu_Religieux",
+                             "Très_Religieux"
+                           )),
+    occupation = factor(occupation,
+                    levels = 1:7,
+                    labels = c(
+                      "Non Employé / Chomeur/Retraiter/Autre",# 1
+                      "Ouvrier Non Qualifié",                 # 2
+                      "Ouvrier Qualifié",                     # 3
+                      "Employé Non Qualifié",                 # 4
+                      "Employé de Bureau Qualifié",           # 5
+                      "Cadre Intermédiaire",                  # 6
+                      "Cadre Supérieur / Profession Libérale" # 7
+                    )),
+     education = factor(education, levels = c(9, 12, 14, 16, 17, 18, 20), labels = c(
+      "École primaire (9)",
+      "Secondaire diplômé (12)",
+      "Collège partiel (14)",
+      "Études supérieures (16)",
+      "Maîtrise (17)",
+      "Ph.D., M.D. ou Autre diplôme d’études supérieures(18)",
+      "Doctorat ou plus (20)"
+    )),
+     yearsmarried = factor(yearsmarried,
+                      levels = c(0.125, 0.417, 0.75, 1.5, 4, 7, 10, 15),
+                      labels = c(
+                        "3 mois ou moins",
+                        "4 à 6 mois",
+                        "6 mois à 1 an",
+                        "1 à 2 ans",
+                        "3 à 5 ans",
+                        "6 à 8 ans",
+                        "9 à 11 ans",
+                        "12 ans ou plus"
+                      ))
+
+
+  ) 
+  
+
+summary(Infidélité)
+```
+
+##Explication 
+
+Afin de mieux comprendre la structure de notre jeu de données, nous avons réalisé une analyse descriptive des #variables principales. Cette étape nous a permis de calculer les effectifs et les fréquences relatives pour #chaque modalité.
+
+Par exemple, nous constatons que 75 % des individus déclarent n’avoir jamais eu de relation extraconjugale, #tandis que les autres se répartissent entre des comportements occasionnels (comme "Accident de Parcours", 5,7 #%) ou plus fréquents, bien que plus rares (comme "Champion Olympique de la Tromperie", 6,3 %).
+
+En ce qui concerne l’ancienneté du mariage, un tiers des répondants (33,9 %) sont mariés depuis plus de 12 ans, #ce qui pourrait être un facteur influençant les comportements extraconjugaux, hypothèse que nous explorerons #plus loin.
+
+L’âge moyen des participants est de 32,5 ans, avec une majorité ayant des enfants (71,5 %). Les variables comme #la religiosité, le niveau d’études, la profession ou encore la satisfaction conjugale sont également bien #réparties, ce qui nous offre une base solide pour analyser leurs effets potentiels sur l’infidélité.
+
+Cette analyse exploratoire nous permet ainsi de mieux cerner les profils représentés dans l’échantillon
+
+```{r}
+datasummary_skim(Infidélité)
+```
+
+
+#Visualisation 1
+
+Nous avons choisi, dans un premier temps, de réaliser un graphique en barres représentant la fréquence des relations extraconjugales en fonction du sexe. L’objectif est d’observer si une différence notable existe entre les hommes et les femmes quant à leur propension à l’infidélité.
+
+On observe que la grande majorité des individus, hommes comme femmes, déclarent n’avoir eu aucune relation extraconjugale, ce qui se reflète par la barre la plus haute à gauche. Ensuite, on voit que les cas d'infidélité (de type « une fois », « deux fois », ou plus fréquemment) sont beaucoup moins nombreux, quelles que soient les catégories. Les différences entre les sexes sont globalement peu marquées, bien qu’on remarque par exemple que dans la catégorie « Accident de Parcours (Une fois) », les hommes sont légèrement plus représentés que les femmes.
+
+```{r}
+# Calcul de la fréquence des infidélités selon le sexe
+
+ggplot(
+  Infidélité, aes(x = affairs, fill = gender)
+) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Infidélité par sexe",
+    x = "Fréquence des relations extraconjugales",
+    y = "Nombre d'individus",
+    fill = "Sexe"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "top")+ theme(axis.text.x = element_text(angle = 25, vjust = 0.5))
+
+#ou
+
+# Préparer les données : proportion d'infidélité par sexe
+data_infi_sexe <- Infidélité %>%
+  count(gender, affairs) %>%
+  group_by(gender) %>%
+  mutate(pourcentage = n / sum(n))
+
+# Graphique
+ggplot(data_infi_sexe, aes(x = affairs, y = pourcentage, fill = affairs)) +
+  geom_col() +
+  facet_wrap(~ gender) +
+  labs(
+    title = "Répartition des types d'infidélité selon le sexe",
+    subtitle = "Proportion de chaque type d'infidélité chez les hommes et les femmes",
+    x = "",
+    y = "Proportion",
+    fill = "Type d'infidélité"
+  ) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  scale_fill_brewer(palette = "Spectral") +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 25, hjust = 1),
+    axis.ticks = element_blank()
+  )
+# Préparation des données : proportion par sexe et type d'infidélité
+data_infi_prop <- Infidélité %>%
+  count(gender, affairs) %>%
+  group_by(gender) %>%
+  mutate(proportion = n / sum(n))
+
+# Graphique : homme vs femme sur le même graphique
+ggplot(data_infi_prop, aes(x = affairs, y = proportion, fill = gender)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Proportion des types d'infidélité selon le sexe",
+    x = "Type d'infidélité",
+    y = "Proportion",
+    fill = "Sexe"
+  ) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    axis.text.x = element_text(angle = 25, hjust = 1)
+  )
+
+    axis.text.x = element_text(angle = 25, hjust = 1)
+  )
+
+# faire des facettes pour avoir les catégories ( petite trompeur ( homme femme etc ))
+
+```
+#Visualisation 2
+
+
+
+```{r}
+#Satisfaction conjugale et infidélité
+# On compte d'abord les combinaisons satisfaction × infidélité
+satisfaction_data <- Infidélité %>%
+  count(rating, affairs) %>%
+  group_by(rating) %>%
+  mutate(prop = n / sum(n))  # on calcule la proportion dans chaque groupe
+
+# Puis on trace avec geom_col()
+ggplot(satisfaction_data, aes(x = rating, y = prop, fill = affairs)) +
+  geom_col(position = "stack") +
+  labs(
+    title = "Lien_entre_satisfaction_conjugale_et_infidélité",
+    x = "SatisfactionDuMariage",
+    y = "Proportion",
+    fill =  "Fréquenced'infidélité"
+  ) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    axis.text.x = element_text(angle = 25, hjust = 0.5)
+  )
+
+
+```
+
+##Explication 
+
+Nous avons choisir le graphique empilé comme type de visualisation car il nous permet de comparer efficacement #les proportions de comportements au sein de chaque groupe. En empilant les différentes catégories d’infidélité #dans une même barre, c'est facile de voir comment la répartition évolue selon le degré de satisfaction dans le #couple.
+
+Le graphique ci-dessous illustre la relation entre la satisfaction conjugale et la fréquence des relations #extraconjugales. Chaque barre représente une catégorie de satisfaction dans le mariage, allant de "Très #malheureux" à "Très heureux", et est divisée selon les différents types d’infidélité. On observe une tendance #nette : plus les individus se disent heureux en couple, plus ils déclarent ne pas avoir eu de relation #extraconjugale. À l’inverse, chez les personnes très ou plutôt malheureuses, la part d’infidélité augmente, #avec une plus grande diversité de comportements extraconjugaux, allant d’un seul écart à des situations #d’infidélité fréquentes. Cela suggère que la satisfaction conjugale joue un rôle protecteur vis-à-vis de #l’infidélité, même si quelques cas d'infidélité existent également parmi les personnes se déclarant plutôt ou #très heureuses
+
+
+
+```{r}
+
+Infidélité2 <- Infidélité %>%
+  filter(str_trim(affairs) != "Aucune Relation Extraconjugale")
+
+
+```
+
+
+#Visualisation 3
+
+
+
+```{r}
+
+# Préparation des données : comptage croisé religiosité × infidélité
+heat_relig <- Infidélité2 %>%
+   filter(affairs != "Champion Olympique de la Tromperie") %>%  
+   count(religiousness, affairs)
+
+# Affichage sous forme de carte de chaleur
+ggplot(heat_relig, aes(x = religiousness, y = affairs, fill = n)) +
+  geom_tile(color = "white") +
+  labs(
+    title = "Carte de chaleur : Religiosité et infidélité",
+    x = "Religiosité",
+    y = "Fréquence d'infidélité",
+    fill = "Nombre d'individus"
+  ) +
+  scale_fill_gradient(low = "lightblue", high = "darkred") +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+```
+Ce graphique représente la relation entre la religiosité des individus (axe horizontal) et la fréquence des #comportements extraconjugaux (axe vertical), via une carte de chaleur.Nous avons choisir de faire une carte de couleur carcela permet de croiser les deux variables catégorielles (religion et infidélité) de manière intuitive.Le remplissage par couleur est pratique selon nous car il aide à visualiser immédiatement les zones de concentration de comportements. Les couleurs indiquent le nombre d’individus présents dans chaque combinaison : plus la couleur est rouge foncé, plus la fréquence est élevée.
+
+On observe que :
+
+Les individus légèrement religieux et pas du tout religieux comptent davantage de cas d’infidélité, notamment #dans les catégories telles que "Accident de Parcours", "Amateur d’Aventure", ou même "Champion Olympique de la #Tromperie".
+
+À l’inverse, les profils très religieux semblent globalement moins représentés dans toutes les formes #d’infidélité, ce qui suggère un effet possible de la pratique religieuse sur les comportements conjugaux.
+
+Spécificiter 
+
+Nous avons choisi d’exclure volontairement la catégorie "Aucune Relation Extraconjugale" de cette visualisation pour plusieurs raisons car cette modalité représente environ 75 % des observations du jeu de données ainsi l’inclure écrase les autres catégories dans la carte de chaleur, ce qui empêche toute lecture fine des variations. 
+
+De plus, notre objectif ici n'est pas de montrer la fidélité en général, mais de mieux comprendre les profils des individus ayant déjà eu au moins une relation extraconjugale. Ce choix permet d’isoler les comportements infidèles et de les analyser selon la religiosité, sans être biaisé par la majorité fidèle.
+
+
+#Visualisation 4
+
+```{r}
+#Écart d’infidélité selon le sexe vs moyenne générale
+
+data_sex_ecart <- Infidélité %>%
+  count(gender, affairs) %>%
+  group_by(gender) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup() %>%
+  group_by(affairs) %>%
+  mutate(moyenne = mean(prop),
+         ecart = prop - moyenne,
+         signe = if_else(ecart >= 0, "+", "-"))
+
+# Graphique
+ggplot(data_sex_ecart, aes(x = affairs, y = ecart, fill = signe)) +
+  geom_col() +
+  facet_wrap(~gender) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(
+    title = "Écart entre hommes et femmes sur les types d'infidélité",
+    subtitle = "Comparé à la moyenne générale",
+    x = "Type d'infidélité",
+    y = "Écart à la moyenne",
+    caption = "Source : dataset Affairs"
+  ) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 100, hjust =0.5))
+
+
+
+
+```
+
+
+Ce graphique à barres met en évidence les différences entre hommes et femmes concernant les types d’infidélité, en les comparant à la moyenne générale. L’axe horizontal présente les différentes catégories, allant de la fidélité (“Aucune Relation Extraconjugale”) jusqu’à l’infidélité quotidienne (“Champion Olympique de la Tromperie”), tandis que l’axe vertical indique l’écart par rapport à la moyenne globale, exprimé en pourcentage. Un écart positif signifie que le groupe est plus représenté que la moyenne, un écart négatif qu’il l’est moins. 
+
+On observe que les femmes sont davantage représentées dans la catégorie des personnes fidèles, avec un écart positif marqué, alors que les hommes sont surreprésentés dans les catégories d’infidélité occasionnelle ou régulière (notamment “Accident de Parcours”, “Récidiviste Timide” ou “Petit Trompeur Régulier”). Les deux sexes se rejoignent sur les infidélités très fréquentes, qui restent rares. 
+
+Globalement, le graphique suggère que les femmes tendent à être plus fidèles que la moyenne, alors que les hommes ont plus souvent un comportement infidèle, en particulier ponctuel ou répété. Ce type de visualisation permet de mieux saisir les différences de comportement entre les sexes en matière d’infidélité.
+
+
+
+
+# Visualisation 5
+
+```{r}
+data_lollipop <- Infidélité %>%
+  count(children, affairs) %>%
+  group_by(children) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup()
+
+# Graphique Lollipop
+ggplot(data_lollipop, aes(x = prop, y = fct_rev(affairs), color = children)) +
+  geom_segment(aes(x = 0, xend = prop, y = fct_rev(affairs), yend = fct_rev(affairs)), size = 1.2, alpha = 0.6) +
+  geom_point(size = 4) +
+  labs(
+    title = "Comparaison des types d'infidélité selon la présence d'enfants",
+    x = "Proportion",
+    y = "Type d'infidélité",
+    color = "Enfants"
+  ) +
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+  scale_color_manual(values = c("Oui" = "orchid", "Non" = "steelblue")) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    axis.text.y = element_text(size = 11),
+    axis.text.x = element_text(size = 10)
+  )
+
+```
+#Ce graphique illustre la répartition proportionnelle des différents types d’infidélité entre les individus #ayant des enfants et ceux n’en ayant pas. Chaque ligne représente une catégorie de comportement extraconjugal, #allant de l'absence totale d'infidélité jusqu'aux formes les plus fréquentes ou régulières. Pour chaque #modalité, deux points sont affichés : un pour les individus avec enfants (rose) et un pour ceux sans enfants #(bleu foncé), reliés par une ligne horizontale.
+
+#On observe immédiatement que la catégorie "Aucune Relation Extraconjugale" domine très largement, aussi bien #chez les personnes avec enfants que chez celles sans enfants. Cela montre que la majorité des individus se #déclarent fidèles, peu importe leur situation parentale.
+
+#Les autres formes d’infidélité — telles que "Accident de Parcours (Une fois)", "Amateur d’Aventure (4 à 10 #fois)" ou "Récidiviste (Deux fois)" — sont beaucoup moins fréquentes. On remarque cependant que les personnes #sans enfants ont tendance à déclarer légèrement plus de comportements infidèles dans certaines catégories, en #particulier pour les infidélités occasionnelles.
+
+
+Application interactives sur Infidélité en fonction de l'âge et de la durée du mariage
+
+```{r}
+
+# Charger les données
+data("Affairs")
+
+# Recoder les types d'infidélité en texte (pour filtrer plus clairement)
+Affairs <- Affairs %>%
+  mutate(
+    infidelite_cat = case_when(
+      affairs == 0 ~ "Aucune Relation Extraconjugale",
+      affairs == 1 ~ "Accident de Parcours (1 fois)",
+      affairs == 2 ~ "Récidiviste (2 fois)",
+      affairs == 3 ~ "Petit Trompeur Régulier (3 fois)",
+      affairs >= 4 & affairs <= 10 ~ "Amateur d'Aventure (4 à 10 fois)",
+      affairs > 10 ~ "Champion Olympique de la Tromperie"
+    ),
+    infidelite_cat = factor(infidelite_cat, levels = c(
+      "Aucune Relation Extraconjugale",
+      "Accident de Parcours (1 fois)",
+      "Récidiviste (2 fois)",
+      "Petit Trompeur Régulier (3 fois)",
+      "Amateur d'Aventure (4 à 10 fois)",
+      "Champion Olympique de la Tromperie"
+    ))
+  )
+
+# Interface utilisateur
+ui <- fluidPage(
+  titlePanel("Exploration de l'infidélité selon l'âge et les années de mariage"),
+
+  sidebarLayout(
+    sidebarPanel(
+      sliderInput("ageRange", "Tranche d'âge :", min = 17, max = 70, value = c(20, 60)),
+      sliderInput("marriageRange", "Années de mariage :", min = 0, max = 25, value = c(0, 15)),
+      selectInput("colorVar", "Variable de couleur :", 
+                  choices = c("Nombre d'infidélités (affairs)" = "affairs", 
+                              "Satisfaction conjugale (rating)" = "rating")),
+      checkboxGroupInput("infideliteFilter", "Niveaux d'infidélité à afficher :", 
+                         choices = levels(Affairs$infidelite_cat),
+                         selected = levels(Affairs$infidelite_cat))
+    ),
+
+    mainPanel(
+      tabsetPanel(
+        tabPanel("Graphique 2D : Points colorés", 
+                 plotOutput("scatterPlot"),
+                 p("Ce graphique montre la répartition des comportements infidèles selon l’âge, les années de mariage, et la variable colorée choisie.")),
+        tabPanel("Graphique 3D : Visualisation interactive", 
+                 plotlyOutput("plotly3D"))
+      )
+    )
+  )
+)
+
+# Serveur
+server <- function(input, output) {
+
+  # Données filtrées dynamiquement
+  filteredData <- reactive({
+    Affairs %>%
+      filter(
+        age >= input$ageRange[1],
+        age <= input$ageRange[2],
+        yearsmarried >= input$marriageRange[1],
+        yearsmarried <= input$marriageRange[2],
+        infidelite_cat %in% input$infideliteFilter
+      )
+  })
+
+  # Graphique 2D
+  output$scatterPlot <- renderPlot({
+    ggplot(filteredData(), aes(x = age, y = yearsmarried, color = .data[[input$colorVar]])) +
+      geom_point(alpha = 0.7, size = 3) +
+      scale_color_gradient(low = "lightblue", high = "darkred") +
+      labs(
+        title = "Infidélité en fonction de l'âge et des années de mariage",
+        x = "Âge",
+        y = "Années de mariage",
+        color = input$colorVar
+      ) +
+      theme_minimal()
+  })
+
+  # Graphique 3D interactif
+  output$plotly3D <- renderPlotly({
+    plot_ly(
+      data = filteredData(),
+      x = ~age,
+      y = ~yearsmarried,
+      z = ~affairs,
+      color = ~affairs,
+      type = "scatter3d",
+      mode = "markers",
+      marker = list(size = 4, opacity = 0.6, colorbar = list(title = "Infidélité"))
+    ) %>%
+      layout(
+        scene = list(
+          xaxis = list(title = "Âge"),
+          yaxis = list(title = "Années de mariage"),
+          zaxis = list(title = "Niveau d'infidélité (affairs)")
+        ),
+        title = "Graphique 3D : Âge, mariage et infidélité"
+      )
+  })
+}
+
+# Lancer l'app
+shinyApp(ui = ui, server = server)
+
+
+```
+#Dans cette application Shiny, nous avons voulu comprendre si des facteurs comme l’âge et les années de mariage #pouvaient avoir un lien avec le niveau d’infidélité des individus. Pour cela, nous avons utilisé deux types de #visualisations, dont une en 3D.
+
+#Le graphique 3D est interactif et permet de visualiser chaque personne comme un point placé dans l’espace. #L’axe horizontal (X) représente l’âge, l’axe vertical (Y) correspond au nombre d’années de mariage, et la #profondeur (axe Z) indique le nombre d’infidélités déclarées, c’est-à-dire la variable affairs. En plus, la #couleur du point change en fonction de ce même niveau d’infidélité : plus la couleur est foncée, plus la #personne a déclaré avoir eu de relations extraconjugales.
+
+#Ce graphique est particulièrement utile car il nous permet de voir plusieurs choses en même temps : par #exemple, on peut repérer s’il y a une tendance à tromper davantage quand on est marié depuis longtemps ou à un #certain âge. Grâce à l’interactivité, on peut aussi faire tourner le graphique pour mieux voir certaines zones.
+
+#Pour créer ce graphique, on a utilisé la fonction plot_ly() du package plotly, qui permet d’afficher un nuage #de points en trois dimensions. Chaque point correspond à une ligne du jeu de données, et on utilise les #variables d’âge, d’années de mariage et d’infidélité pour placer ce point dans l’espace.
+
+
+Applications finalles avec l'ensemble des graphiques interactifs les uns avec les autres 
+
+```{r}
+
+
+library(shiny)
+library(tidyverse)
+library(scales)
+library(forcats)
+
+# Chargement et préparation des données
+data("Affairs", package = "AER")
+
+Infidélité <- Affairs %>%
+  mutate(
+    affairs = ifelse(affairs == 0, "Aucune",
+              ifelse(affairs == 1, "Une fois",
+              ifelse(affairs == 2, "Deux fois",
+              ifelse(affairs == 3, "Trois fois",
+              ifelse(affairs == 7, "4 à 10 fois", "Beaucoup (plus de 10)"))))),
+    children = factor(children, labels = c("Non", "Oui")),
+    rating = factor(rating, levels = 1:5,
+                    labels = c("Très malheureux", "Plutôt malheureux", "Moyen", "Plutôt heureux", "Très heureux")),
+    gender = as.factor(gender)
+  )
+
+# UI
+ui <- fluidPage(
+  titlePanel("Application Interractive – Infidélité & Facteurs"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("sexe", "Sexe :", choices = c("Tous", levels(Infidélité$gender)), selected = "Tous"),
+      selectInput("enfants", "Présence d’enfants :", choices = c("Tous", levels(Infidélité$children)), selected = "Tous"),
+      checkboxGroupInput("types", "Types d’infidélité :", choices = unique(Infidélité$affairs), selected = unique(Infidélité$affairs)),
+      actionButton("update", "Mettre à jour", icon = icon("refresh"))
+    ),
+    mainPanel(
+      tabsetPanel(
+        tabPanel("Visualisation 1", plotOutput("graph1")),
+        tabPanel("Visualisation 2", plotOutput("graph2")),
+        tabPanel("Visualisation 3", plotOutput("graph3")),
+        tabPanel("Visualisation 4", plotOutput("graph4")),
+        tabPanel("Visualisation 5", plotOutput("graph5"))
+      )
+    )
+  )
+)
+
+# SERVER
+server <- function(input, output, session) {
+  
+  # Données filtrées uniquement lors du clic sur le bouton
+  filtered_data <- eventReactive(input$update, {
+    df <- Infidélité
+    if (input$sexe != "Tous") df <- df %>% filter(gender == input$sexe)
+    if (input$enfants != "Tous") df <- df %>% filter(children == input$enfants)
+    df <- df %>% filter(affairs %in% input$types)
+    df
+  })
+  
+  output$graph1 <- renderPlot({
+    ggplot(filtered_data(), aes(x = affairs, fill = gender)) +
+      geom_bar(position = "dodge") +
+      labs(title = "Infidélité par sexe", x = "Infidélité", y = "Nombre") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  })
+  
+  output$graph2 <- renderPlot({
+    data <- filtered_data() %>%
+      count(rating, affairs) %>%
+      group_by(rating) %>%
+      mutate(prop = n / sum(n))
+    
+    ggplot(data, aes(x = rating, y = prop, fill = affairs)) +
+      geom_col(position = "stack") +
+      labs(title = "Satisfaction conjugale et infidélité", x = "Satisfaction", y = "Proportion") +
+      scale_y_continuous(labels = percent_format()) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 25, hjust = 1))
+  })
+  
+  output$graph3 <- renderPlot({
+    data <- filtered_data() %>%
+      filter(affairs != "Aucune") %>%
+      count(religiousness, affairs)
+    
+    ggplot(data, aes(x = religiousness, y = affairs, fill = n)) +
+      geom_tile(color = "white") +
+      labs(title = "Religiosité et infidélité", x = "Religiosité", y = "Type d'infidélité") +
+      scale_fill_gradient(low = "lightblue", high = "darkred") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  })
+  
+  output$graph4 <- renderPlot({
+    data <- filtered_data() %>%
+      count(gender, affairs) %>%
+      group_by(gender) %>%
+      mutate(prop = n / sum(n)) %>%
+      ungroup() %>%
+      group_by(affairs) %>%
+      mutate(moyenne = mean(prop), ecart = prop - moyenne, signe = if_else(ecart >= 0, "+", "-"))
+    
+    ggplot(data, aes(x = affairs, y = ecart, fill = signe)) +
+      geom_col() +
+      facet_wrap(~gender) +
+      geom_hline(yintercept = 0, linetype = "dashed") +
+      labs(title = "Écart hommes/femmes sur l'infidélité", x = "Type d'infidélité", y = "Écart à la moyenne") +
+      scale_y_continuous(labels = percent_format()) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  })
+  
+  output$graph5 <- renderPlot({
+    data <- filtered_data() %>%
+      count(children, affairs) %>%
+      group_by(children) %>%
+      mutate(prop = n / sum(n))
+    
+    ggplot(data, aes(x = prop, y = fct_rev(affairs), color = children)) +
+      geom_segment(aes(x = 0, xend = prop, y = fct_rev(affairs), yend = fct_rev(affairs)), size = 1.2) +
+      geom_point(size = 4) +
+      labs(title = "Infidélité et présence d'enfants", x = "Proportion", y = "Type d'infidélité") +
+      scale_x_continuous(labels = percent_format()) +
+      scale_color_manual(values = c("Oui" = "orchid", "Non" = "steelblue")) +
+      theme_minimal() +
+      theme(legend.position = "top", axis.text.y = element_text(size = 11))
+  })
+}
+
+# Run app
+shinyApp(ui = ui, server = server)
+
+
+
+```
+
+
+

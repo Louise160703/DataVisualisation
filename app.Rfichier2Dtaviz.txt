@@ -1,0 +1,132 @@
+
+
+library(shiny)
+library(tidyverse)
+library(scales)
+library(forcats)
+
+
+
+# Chargement et préparation des données
+data("Affairs", package = "AER")
+
+Infidélité <- Affairs %>%
+  mutate(
+    affairs = ifelse(affairs == 0, "Aucune",
+                     ifelse(affairs == 1, "Une fois",
+                            ifelse(affairs == 2, "Deux fois",
+                                   ifelse(affairs == 3, "Trois fois",
+                                          ifelse(affairs == 7, "4 à 10 fois", "Beaucoup (plus de 10)"))))),
+    children = factor(children, labels = c("Non", "Oui")),
+    rating = factor(rating, levels = 1:5,
+                    labels = c("Très malheureux", "Plutôt malheureux", "Moyen", "Plutôt heureux", "Très heureux")),
+    gender = as.factor(gender)
+  )
+
+# UI
+ui <- fluidPage(
+  titlePanel("Application Interractive – Infidélité & Facteurs"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("sexe", "Sexe :", choices = c("Tous", levels(Infidélité$gender)), selected = "Tous"),
+      selectInput("enfants", "Présence d’enfants :", choices = c("Tous", levels(Infidélité$children)), selected = "Tous"),
+      checkboxGroupInput("types", "Types d’infidélité :", choices = unique(Infidélité$affairs), selected = unique(Infidélité$affairs)),
+      actionButton("update", "Mettre à jour", icon = icon("refresh"))
+    ),
+    mainPanel(
+      tabsetPanel(
+        tabPanel("Visualisation 1", plotOutput("graph1")),
+        tabPanel("Visualisation 2", plotOutput("graph2")),
+        tabPanel("Visualisation 3", plotOutput("graph3")),
+        tabPanel("Visualisation 4", plotOutput("graph4")),
+        tabPanel("Visualisation 5", plotOutput("graph5"))
+      )
+    )
+  )
+)
+
+# SERVER
+server <- function(input, output, session) {
+  
+  # Données filtrées uniquement lors du clic sur le bouton
+  filtered_data <- eventReactive(input$update, {
+    df <- Infidélité
+    if (input$sexe != "Tous") df <- df %>% filter(gender == input$sexe)
+    if (input$enfants != "Tous") df <- df %>% filter(children == input$enfants)
+    df <- df %>% filter(affairs %in% input$types)
+    df
+  })
+  
+  output$graph1 <- renderPlot({
+    ggplot(filtered_data(), aes(x = affairs, fill = gender)) +
+      geom_bar(position = "dodge") +
+      labs(title = "Infidélité par sexe", x = "Infidélité", y = "Nombre") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  })
+  
+  output$graph2 <- renderPlot({
+    data <- filtered_data() %>%
+      count(rating, affairs) %>%
+      group_by(rating) %>%
+      mutate(prop = n / sum(n))
+    
+    ggplot(data, aes(x = rating, y = prop, fill = affairs)) +
+      geom_col(position = "stack") +
+      labs(title = "Satisfaction conjugale et infidélité", x = "Satisfaction", y = "Proportion") +
+      scale_y_continuous(labels = percent_format()) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 25, hjust = 1))
+  })
+  
+  output$graph3 <- renderPlot({
+    data <- filtered_data() %>%
+      filter(affairs != "Aucune") %>%
+      count(religiousness, affairs)
+    
+    ggplot(data, aes(x = religiousness, y = affairs, fill = n)) +
+      geom_tile(color = "white") +
+      labs(title = "Religiosité et infidélité", x = "Religiosité", y = "Type d'infidélité") +
+      scale_fill_gradient(low = "lightblue", high = "darkred") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  })
+  
+  output$graph4 <- renderPlot({
+    data <- filtered_data() %>%
+      count(gender, affairs) %>%
+      group_by(gender) %>%
+      mutate(prop = n / sum(n)) %>%
+      ungroup() %>%
+      group_by(affairs) %>%
+      mutate(moyenne = mean(prop), ecart = prop - moyenne, signe = if_else(ecart >= 0, "+", "-"))
+    
+    ggplot(data, aes(x = affairs, y = ecart, fill = signe)) +
+      geom_col() +
+      facet_wrap(~gender) +
+      geom_hline(yintercept = 0, linetype = "dashed") +
+      labs(title = "Écart hommes/femmes sur l'infidélité", x = "Type d'infidélité", y = "Écart à la moyenne") +
+      scale_y_continuous(labels = percent_format()) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  })
+  
+  output$graph5 <- renderPlot({
+    data <- filtered_data() %>%
+      count(children, affairs) %>%
+      group_by(children) %>%
+      mutate(prop = n / sum(n))
+    
+    ggplot(data, aes(x = prop, y = fct_rev(affairs), color = children)) +
+      geom_segment(aes(x = 0, xend = prop, y = fct_rev(affairs), yend = fct_rev(affairs)), size = 1.2) +
+      geom_point(size = 4) +
+      labs(title = "Infidélité et présence d'enfants", x = "Proportion", y = "Type d'infidélité") +
+      scale_x_continuous(labels = percent_format()) +
+      scale_color_manual(values = c("Oui" = "orchid", "Non" = "steelblue")) +
+      theme_minimal() +
+      theme(legend.position = "top", axis.text.y = element_text(size = 11))
+  })
+}
+
+# Run app
+shinyApp(ui = ui, server = server)

@@ -1,0 +1,111 @@
+library(shiny)
+library(tidyverse)
+library(scales)
+library(forcats)
+
+# Charger les données
+data("Affairs")
+
+# Recoder les types d'infidélité en texte (pour filtrer plus clairement)
+Affairs <- Affairs %>%
+  mutate(
+    infidelite_cat = case_when(
+      affairs == 0 ~ "Aucune Relation Extraconjugale",
+      affairs == 1 ~ "Accident de Parcours (1 fois)",
+      affairs == 2 ~ "Récidiviste (2 fois)",
+      affairs == 3 ~ "Petit Trompeur Régulier (3 fois)",
+      affairs >= 4 & affairs <= 10 ~ "Amateur d'Aventure (4 à 10 fois)",
+      affairs > 10 ~ "Champion Olympique de la Tromperie"
+    ),
+    infidelite_cat = factor(infidelite_cat, levels = c(
+      "Aucune Relation Extraconjugale",
+      "Accident de Parcours (1 fois)",
+      "Récidiviste (2 fois)",
+      "Petit Trompeur Régulier (3 fois)",
+      "Amateur d'Aventure (4 à 10 fois)",
+      "Champion Olympique de la Tromperie"
+    ))
+  )
+
+# Interface utilisateur
+ui <- fluidPage(
+  titlePanel("Exploration de l'infidélité selon l'âge et les années de mariage"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      sliderInput("ageRange", "Tranche d'âge :", min = 17, max = 70, value = c(20, 60)),
+      sliderInput("marriageRange", "Années de mariage :", min = 0, max = 25, value = c(0, 15)),
+      selectInput("colorVar", "Variable de couleur :", 
+                  choices = c("Nombre d'infidélités (affairs)" = "affairs", 
+                              "Satisfaction conjugale (rating)" = "rating")),
+      checkboxGroupInput("infideliteFilter", "Niveaux d'infidélité à afficher :", 
+                         choices = levels(Affairs$infidelite_cat),
+                         selected = levels(Affairs$infidelite_cat))
+    ),
+    
+    mainPanel(
+      tabsetPanel(
+        tabPanel("Graphique 2D : Points colorés", 
+                 plotOutput("scatterPlot"),
+                 p("Ce graphique montre la répartition des comportements infidèles selon l’âge, les années de mariage, et la variable colorée choisie.")),
+        tabPanel("Graphique 3D : Visualisation interactive", 
+                 plotlyOutput("plotly3D"))
+      )
+    )
+  )
+)
+
+# Serveur
+server <- function(input, output) {
+  
+  # Données filtrées dynamiquement
+  filteredData <- reactive({
+    Affairs %>%
+      filter(
+        age >= input$ageRange[1],
+        age <= input$ageRange[2],
+        yearsmarried >= input$marriageRange[1],
+        yearsmarried <= input$marriageRange[2],
+        infidelite_cat %in% input$infideliteFilter
+      )
+  })
+  
+  # Graphique 2D
+  output$scatterPlot <- renderPlot({
+    ggplot(filteredData(), aes(x = age, y = yearsmarried, color = .data[[input$colorVar]])) +
+      geom_point(alpha = 0.7, size = 3) +
+      scale_color_gradient(low = "lightblue", high = "darkred") +
+      labs(
+        title = "Infidélité en fonction de l'âge et des années de mariage",
+        x = "Âge",
+        y = "Années de mariage",
+        color = input$colorVar
+      ) +
+      theme_minimal()
+  })
+  
+  # Graphique 3D interactif
+  output$plotly3D <- renderPlotly({
+    plot_ly(
+      data = filteredData(),
+      x = ~age,
+      y = ~yearsmarried,
+      z = ~affairs,
+      color = ~affairs,
+      type = "scatter3d",
+      mode = "markers",
+      marker = list(size = 4, opacity = 0.6, colorbar = list(title = "Infidélité"))
+    ) %>%
+      layout(
+        scene = list(
+          xaxis = list(title = "Âge"),
+          yaxis = list(title = "Années de mariage"),
+          zaxis = list(title = "Niveau d'infidélité (affairs)")
+        ),
+        title = "Graphique 3D : Âge, mariage et infidélité"
+      )
+  })
+}
+
+# Lancer l'app
+shinyApp(ui = ui, server = server)
